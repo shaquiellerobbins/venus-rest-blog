@@ -1,14 +1,17 @@
 package shaq.venusrestblog.controller;
 
+import lombok.AllArgsConstructor;
+import org.springframework.beans.BeanUtils;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import shaq.venusrestblog.data.Category;
 import shaq.venusrestblog.data.Post;
-
 import shaq.venusrestblog.data.User;
+import shaq.venusrestblog.misc.FieldHelper;
 import shaq.venusrestblog.repository.CategoriesRepository;
 import shaq.venusrestblog.repository.PostsRepository;
 import shaq.venusrestblog.repository.UsersRepository;
-import lombok.AllArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -64,10 +67,19 @@ public class PostsController {
 
     @PutMapping("/{id}")
     public void updatePost(@RequestBody Post updatedPost, @PathVariable long id) {
+        Optional<Post> originalPost = postsRepository.findById(id);
+        if(originalPost.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post " + id + " not found");
+        }
+
         // in case id is not in the request body (i.e., updatedPost), set it
         // with the path variable id
         updatedPost.setId(id);
-        postsRepository.save(updatedPost);
+
+        // copy any new field values FROM updatedPost TO originalPost
+        BeanUtils.copyProperties(updatedPost, originalPost.get(), FieldHelper.getNullPropertyNames(updatedPost));
+
+        postsRepository.save(originalPost.get());
 
 //        // find the post to update in the posts list
 //
