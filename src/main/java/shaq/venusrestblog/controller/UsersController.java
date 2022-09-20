@@ -1,11 +1,14 @@
 package shaq.venusrestblog.controller;
 
-import shaq.venusrestblog.data.User;
-import shaq.venusrestblog.repository.UsersRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import shaq.venusrestblog.data.User;
+import shaq.venusrestblog.data.UserRole;
+import shaq.venusrestblog.repository.UsersRepository;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -16,6 +19,8 @@ import java.util.Optional;
 @RequestMapping(value = "/api/users", produces = "application/json")
 public class UsersController {
     private UsersRepository usersRepository;
+
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping("")
     public List<User> fetchUsers() {
@@ -28,8 +33,10 @@ public class UsersController {
     }
 
     @GetMapping("/me")
-    private Optional<User> fetchMe() {
-        return usersRepository.findById(1L);
+    private Optional<User> fetchMe(OAuth2Authentication auth) {
+        String userName = auth.getName();
+        User user = usersRepository.findByUserName(userName);
+        return Optional.of(user);
     }
 
 //    @GetMapping("/username/{userName}")
@@ -47,43 +54,47 @@ public class UsersController {
 //        return user;
 //    }
 
-    @PostMapping("/create")
-    public void createUser(@RequestBody User newUser) {
-        // don't need the below line at this point but just for kicks
-        newUser.setCreatedAt(LocalDate.now());
-        usersRepository.save(newUser);
-    }
+        @PostMapping("/create")
+        public void createUser (@RequestBody User newUser){
+            // don't need the below line at this point but just for kicks
+            newUser.setRole(UserRole.USER);
+            String plainTextPassword = newUser.getPassword();
+            String encryptedPassword = passwordEncoder.encode(plainTextPassword);
+            newUser.setPassword(encryptedPassword);
 
-    @DeleteMapping("/{id}")
-    public void deleteUserById(@PathVariable long id) {
-        usersRepository.deleteById(id);
-    }
+            newUser.setCreatedAt(LocalDate.now());
+            usersRepository.save(newUser);
 
-    @PutMapping("/{id}")
-    public void updateUser(@RequestBody User updatedUser, @PathVariable long id) {
-        // find the post to update in the posts list
-        updatedUser.setId(id);
-        usersRepository.save(updatedUser);
-    }
-
-    @PutMapping("/{id}/updatePassword")
-    private void updatePassword(@PathVariable Long id, @RequestParam(required = false) String oldPassword, @RequestParam String newPassword) {
-        User user = usersRepository.findById(id).get();
-//        if(user == null) {
-//            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User id " + id + " not found");
-//        }
-
-        // compare old password with saved pw
-        if(!user.getPassword().equals(oldPassword)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "amscray");
         }
 
-        // validate new password
-        if(newPassword.length() < 3) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "new pw length must be at least 3 characters");
+        @DeleteMapping("/{id}")
+        public void deleteUserById ( @PathVariable long id){
+            usersRepository.deleteById(id);
         }
 
-        user.setPassword(newPassword);
-        usersRepository.save(user);
+        @PutMapping("/{id}")
+        public void updateUser (@RequestBody User updatedUser,@PathVariable long id){
+            // find the post to update in the posts list
+            updatedUser.setId(id);
+            usersRepository.save(updatedUser);
+        }
+
+        @PutMapping("/{id}/updatePassword")
+        private void updatePassword (@PathVariable Long id, @RequestParam(required = false) String
+        oldPassword, @RequestParam String newPassword){
+            User user = usersRepository.findById(id).get();
+
+            // compare old password with saved pw
+            if (!user.getPassword().equals(oldPassword)) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "amscray");
+            }
+
+            // validate new password
+            if (newPassword.length() < 3) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "new pw length must be at least 3 characters");
+            }
+
+            user.setPassword(newPassword);
+            usersRepository.save(user);
+        }
     }
-}

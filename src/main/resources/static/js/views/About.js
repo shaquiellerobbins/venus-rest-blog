@@ -1,11 +1,11 @@
 export default function About(props) {
     return `
         <header>
-            <h1>About Page</h1>
+            <h1>What we're all about</h1>
         </header>
         <main>
             <div>
-                <p>About page is here.</p>  
+                <p>Here's a little about what's going on.</p>  
             </div>
         </main>
     `;

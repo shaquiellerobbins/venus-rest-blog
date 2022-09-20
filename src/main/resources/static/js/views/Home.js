@@ -1,5 +1,5 @@
 export default function Home(props) {
-    console.log("The frontend did it. HER FAULT");
+    console.log("Congratulations, you found me!");
     return `
         <header>
             <h1>Home Page</h1>

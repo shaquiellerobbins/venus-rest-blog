@@ -3,6 +3,7 @@ package shaq.venusrestblog.controller;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import shaq.venusrestblog.data.Category;
@@ -12,6 +13,7 @@ import shaq.venusrestblog.misc.FieldHelper;
 import shaq.venusrestblog.repository.CategoriesRepository;
 import shaq.venusrestblog.repository.PostsRepository;
 import shaq.venusrestblog.repository.UsersRepository;
+import shaq.venusrestblog.services.EmailService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping(value = "/api/posts", produces = "application/json")
 public class PostsController {
+    private EmailService emailService;
     private PostsRepository postsRepository;
     private UsersRepository usersRepository;
     private CategoriesRepository categoriesRepository;
@@ -32,37 +35,40 @@ public class PostsController {
 
     @GetMapping("/{id}")
     public Optional<Post> fetchPostById(@PathVariable long id) {
-        return postsRepository.findById(id);
+        Optional<Post> optionalPost = postsRepository.findById(id);
+        if(optionalPost.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post id " + id + " not found");
+        }
+        return optionalPost;
     }
 
     @PostMapping("")
-    public void createPost(@RequestBody Post newPost) {
-
-        // use a fake author for the post
-        User author = usersRepository.findById(1L).get();
+    public void createPost(@RequestBody Post newPost, OAuth2Authentication auth) {
+        String userName = auth.getName();
+        User author = usersRepository.findByUserName(userName);
         newPost.setAuthor(author);
 
+        newPost.setCategories(new ArrayList<>());
+
+        // use first 2 categories for the post by default
         Category cat1 = categoriesRepository.findById(1L).get();
         Category cat2 = categoriesRepository.findById(2L).get();
-        newPost.setCategories(new ArrayList<>());
+
         newPost.getCategories().add(cat1);
         newPost.getCategories().add(cat2);
-//
-//        // make some fake categories and throw them in the new post
-//        Category cat1 = new Category(1L, "bunnies", null);
-//        Category cat2 = new Category(2L, "margaritas", null);
-//        newPost.setCategories(new ArrayList<>());
-//        newPost.getCategories().add(cat1);
-//        newPost.getCategories().add(cat2);
 
         postsRepository.save(newPost);
+
+        emailService.prepareAndSend(newPost, "Congrats on your new post", "Look inside for further details");
     }
 
     @DeleteMapping("/{id}")
     public void deletePostById(@PathVariable long id) {
+        Optional<Post> optionalPost = postsRepository.findById(id);
+        if(optionalPost.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post id " + id + " not found");
+        }
         postsRepository.deleteById(id);
-        // what to do if we don't find it
-//        throw new RuntimeException("Post not found");
     }
 
     @PutMapping("/{id}")
@@ -80,21 +86,5 @@ public class PostsController {
         BeanUtils.copyProperties(updatedPost, originalPost.get(), FieldHelper.getNullPropertyNames(updatedPost));
 
         postsRepository.save(originalPost.get());
-
-//        // find the post to update in the posts list
-//
-//        Post post = findPostById(id);
-//        if(post == null) {
-//            System.out.println("Post not found");
-//        } else {
-//            if(updatedPost.getTitle() != null) {
-//                post.setTitle(updatedPost.getTitle());
-//            }
-//            if(updatedPost.getContent() != null) {
-//                post.setContent(updatedPost.getContent());
-//            }
-//            return;
-//        }
-//        throw new RuntimeException("Post not found");
     }
 }
